@@ -1,0 +1,350 @@
+# Trust Score for AI Output MVP — Implementation Prompt
+
+## Overview
+Build a web app that analyzes text (especially AI outputs) and returns a **Trust Score (0–100)** with per-claim verification results, supporting evidence, and a human-readable explanation.
+
+## What You're Building
+
+A **3-month MVP** with:
+- Text input UI (paste/upload)
+- Automatic claim extraction from text
+- Per-claim web search and verification
+- Per-claim scores + status (Supported / Unclear / Contradicted)
+- Overall aggregated Trust Score
+- History of past analyses
+- Explainable results with supporting snippets and links
+
+---
+
+## Phase 1: Core MVP (Weeks 1–6)
+
+### Week 1: Project Setup & Backend Skeleton
+**Goal:** Get a working API → Frontend roundtrip.
+
+**Do:**
+- Initialize repo with README, .gitignore, license
+- Create FastAPI backend (or Flask) with `/analyze` endpoint (returns dummy JSON for now)
+- Set up React frontend with text area + Analyze button
+- Wire frontend to backend (POST to `/analyze`, display mock response)
+- Commit: "Basic API skeleton working"
+
+**Deliverable:**
+- Paste text → Click Analyze → See dummy JSON response
+
+---
+
+### Week 2: Claim Extraction
+**Goal:** Extract candidate claims from input text.
+
+**Do:**
+- Implement sentence splitter (use spaCy or simple regex)
+- Filter out non-claims (< 10 chars, metadata, etc.)
+- Limit to top 8 claims per text (for manageability)
+- Display extracted claims on frontend in a list
+
+**Implementation hints:**
+```
+- Split on sentence boundaries: [.!?]
+- Filter: len(sentence) > 10 and not metadata
+- Return: list of claim strings
+```
+
+**Deliverable:**
+- Paste text → See list of extracted claims displayed
+
+---
+
+### Week 3: Search Integration
+**Goal:** Fetch search results for each claim.
+
+**Do:**
+- Choose a search API (SerpAPI, Bing, or Google Custom Search)
+- Sign up & get API key
+- Implement Search Adapter (abstraction layer)
+- Fetch top 3–5 snippets per claim
+- Display snippets + links in UI under each claim
+
+**Implementation hints:**
+```
+For each claim:
+  - Query: claim text
+  - Get: [title, snippet, url] × top 3
+  - Cache: store {claim → results} to avoid repeated calls
+```
+
+**Deliverable:**
+- Each claim shows 2–3 supporting snippets and links
+
+---
+
+### Week 4: Naive Verifier & Per-Claim Scoring
+**Goal:** Score each claim based on search results.
+
+**Do:**
+- Implement keyword/number matching heuristic
+  - Does snippet contain claim keywords?
+  - Do numbers/dates in claim match snippet?
+- Simple scoring formula:
+  ```
+  kw_score = 0–1 (keyword match strength)
+  per_claim_score = 100 * kw_score
+  ```
+- Assign status: Supported (≥70) / Unclear (40–70) / Contradicted (<40)
+- Show per-claim scores + status badges (green/yellow/red)
+
+**Implementation hints:**
+```
+kw_score = len(matched_keywords) / len(claim_keywords)
+score = 100 * kw_score
+if score >= 70: status = "Supported"
+elif score >= 40: status = "Unclear"
+else: status = "Contradicted"
+```
+
+**Deliverable:**
+- Each claim has a score (0–100) + color badge + status
+
+---
+
+### Week 5: Overall Trust Score & Persistence
+**Goal:** Aggregate claim scores and store results.
+
+**Do:**
+- Implement aggregator: weighted average of claim scores
+- Penalize if >30% claims are unsupported (subtract 10–30 points)
+- Display overall score prominently (large gauge or number)
+- Set up SQLite database
+- Store each analysis: (id, input_text, trust_score, claims_json, timestamp)
+- Show analysis history sidebar (clickable to reload past analyses)
+
+**Implementation hints:**
+```
+avg_score = sum(claim_scores) / len(claims)
+unsupported_ratio = unsupported_claims / total_claims
+overall_score = max(0, min(100, avg_score - unsupported_ratio * 25))
+```
+
+**Deliverable:**
+- Overall Trust Score displayed + past analyses stored in sidebar
+
+---
+
+### Week 6: UI Polish & Explainability
+**Goal:** Make it demo-ready and add human-readable explanations.
+
+**Do:**
+- Design a clean, professional UI (Tailwind CSS recommended)
+- Add gauge/progress visualization for trust score
+- Color code: green (≥75) / yellow (50–75) / red (<50)
+- Add explainability text:
+  ```
+  "Overall score: 72/100. Content is mostly supported but has some unclear claims."
+  "3 supported, 1 unclear, 0 contradicted claims found."
+  ```
+- Polish: responsive design, error handling, loading states
+- Test on 10 diverse inputs (factual, false, mixed)
+
+**Deliverable:**
+- Polished UI ready for live demo
+
+---
+
+## Phase 2: Enhancements (Weeks 7–10)
+
+### Week 7: Semantic Matching with Embeddings
+**Goal:** Improve claim-snippet matching using embeddings.
+
+**Do:**
+- Use `sentence-transformers` (lightweight, open-source)
+- For each (claim, snippet) pair, compute cosine similarity
+- Blend similarity score with keyword heuristic:
+  ```
+  blended_score = 0.6 * kw_score + 0.4 * sim_score
+  ```
+- Re-score all claims
+
+**Deliverable:**
+- Improved matching on paraphrased/rephrased claims
+
+---
+
+### Week 8: Caching & Rate Limiting
+**Goal:** Optimize API calls and protect backend.
+
+**Do:**
+- Add Redis or in-process LRU cache
+- Cache key: `claim_hash → search_results`
+- Skip search if claim already cached
+- Implement rate limiting: 10 analyses/minute per IP
+- Add basic API key protection
+
+**Deliverable:**
+- Repeated claims don't trigger new searches
+- Backend protected from abuse
+
+---
+
+### Week 9: Source Authority Weighting
+**Goal:** Prefer high-authority sources.
+
+**Do:**
+- Maintain authority whitelist: .edu, .gov, major media (NYT, BBC, etc.)
+- Authority factor: 1.2 for trusted, 1.0 for neutral, 0.7 for low-authority
+- Rebalance scorer:
+  ```
+  claim_score = blended_score * authority_factor
+  ```
+- Show source authority in UI
+
+**Deliverable:**
+- Same claims score differently based on source credibility
+
+---
+
+### Week 10: Testing & Example Dataset
+**Goal:** Validate accuracy and document behavior.
+
+**Do:**
+- Create curated dataset: ~50 test cases (clearly true, clearly false, mixed, partial)
+- Write unit tests for:
+  - Claim extraction
+  - Scoring logic
+  - Aggregator
+- Manual QA on test cases
+- Document edge cases (e.g., "always/never" language flags)
+
+**Deliverable:**
+- Test suite + passing tests on curated dataset
+
+---
+
+## Phase 3: Polish & Deployment (Weeks 11–12)
+
+### Week 11: Export & Deployment Prep
+**Goal:** Add report export and prepare for deployment.
+
+**Do:**
+- Implement PDF export using WeasyPrint or wkhtmltopdf
+  - Include: input text, all claims with scores, overall score, timestamp
+- Dockerize app (Dockerfile + docker-compose.yml)
+- Set up deployment config for Render/Railway/Heroku
+
+**Deliverable:**
+- Exportable PDF report + Docker image ready
+
+---
+
+### Week 12: Deployment & Documentation
+**Goal:** Go live and document.
+
+**Do:**
+- Deploy to chosen host (Render / Railway)
+- Record 2–3 minute demo video
+  - Show: paste text → analyze → inspect claims → export report
+- Finalize README with:
+  - What it does & limitations
+  - How to run locally
+  - API docs
+  - Future roadmap
+- Share live link + demo video
+
+**Deliverable:**
+- Live demo link + demo video + comprehensive README
+
+---
+
+## Architecture & Tech Stack
+
+### Backend
+- **Framework:** FastAPI (Python 3.10+)
+- **Endpoints:**
+  - `POST /analyze` — Main pipeline
+  - `GET /history` — Past analyses
+  - `POST /export` — Generate PDF
+- **NLP:** spaCy (sentence split), sentence-transformers (embeddings)
+- **Search:** SerpAPI or Bing Web Search API
+- **Database:** SQLite (MVP) → PostgreSQL (later)
+- **Cache:** Redis (optional) or in-process LRU
+
+### Frontend
+- **Framework:** React (Vite)
+- **Styling:** Tailwind CSS
+- **Visualization:** Custom SVG gauge or react-gauge
+- **HTTP:** Axios or Fetch API
+
+### Deployment
+- **Container:** Docker
+- **Host:** Render, Railway, or Heroku
+
+---
+
+## Scoring Formula (Reference)
+
+```
+Per-Claim Score:
+  kw_score = keyword match strength (0–1)
+  sim_score = embedding cosine similarity (0–1)
+  authority = domain credibility factor (0.7–1.2)
+  
+  claim_score = 100 * (0.6 * kw_score + 0.4 * sim_score) * authority
+  clamped to [0, 100]
+
+Overall Score:
+  avg_score = weighted_average(claim_scores)
+  unsupported_ratio = contradicted_claims / total_claims
+  
+  trust_score = max(0, min(100, avg_score - unsupported_ratio * 25))
+
+Status Assignment:
+  Supported: score ≥ 70
+  Unclear: 40 ≤ score < 70
+  Contradicted: score < 40
+```
+
+---
+
+## Key Decisions & Trade-offs
+
+| Aspect | Choice | Why |
+|--------|--------|-----|
+| Search API | SerpAPI (start) | Easy setup, affordable quota |
+| Embeddings | sentence-transformers | Lightweight, no API costs |
+| Database | SQLite (MVP) | No infra, portable |
+| Frontend | React | Fast iteration, clean UI |
+| Deployment | Render or Railway | Simple, free tier available |
+
+---
+
+## Success Criteria (End of 12 weeks)
+
+- ✓ MVP correctly flags clearly true/false claims on diverse examples
+- ✓ Demoable web UI with overall score + per-claim breakdown + links
+- ✓ Repeatable pipeline: claim extraction → search → verification → scoring
+- ✓ Documented repo with README, sample tests, example inputs
+- ✓ One-command deployment (Docker)
+- ✓ 2–3 minute demo video showing end-to-end workflow
+- ✓ Portfolio-ready with limitations documented
+
+---
+
+## Quick Start Checklist
+
+- [ ] Create GitHub repo + README
+- [ ] Set up FastAPI skeleton with `/analyze` endpoint
+- [ ] Create React app with text area + button
+- [ ] Wire frontend → backend
+- [ ] Choose & sign up for search API
+- [ ] Implement basic claim extractor
+- [ ] Test with 5 sample texts
+- [ ] Commit "MVP foundation ready"
+
+---
+
+## Future Enhancements (Post-MVP)
+
+- Fine-tune claim classifier on labeled dataset
+- Browser extension for LinkedIn/ChatGPT integration
+- Domain-specific modules (medical, finance, law)
+- Provenance chain: highlight exact source sentences
+- User authentication & personal dashboards
+- Integration with fact-checking databases (Snopes, FactCheck.org)
