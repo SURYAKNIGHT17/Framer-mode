@@ -1,0 +1,8 @@
+[
+  {
+    "id": "816f47c0-f601-46cd-87a5-ec62e929146c",
+    "email": "test.user@example.com",
+    "passwordHash": "scrypt:78accb97a3ab4d56ab381761bc3b3c4b:8db3a7c06ace25c2491ab019392a1961929c93df7fbaa66a45f46d840af74ace16ef8195c6c74a503ec92c751d7d770ad75a41bfce5f8cad89fc3a7e76c3ae22",
+    "createdAt": "2025-11-20T13:58:32.305Z"
+  }
+]

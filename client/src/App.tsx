@@ -6,11 +6,13 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { ThemeProvider } from "@/components/theme-provider";
 import NotFound from "@/pages/not-found";
 import Home from "@/pages/home";
+import LoginPage from "@/pages/login";
 
 function Router() {
   return (
     <Switch>
       <Route path="/" component={Home} />
+      <Route path="/login" component={LoginPage} />
       <Route component={NotFound} />
     </Switch>
   );
@@ -21,8 +23,10 @@ function App() {
     <QueryClientProvider client={queryClient}>
       <ThemeProvider defaultTheme="light">
         <TooltipProvider>
-          <Toaster />
-          <Router />
+          <div className="app-pattern min-h-screen">
+            <Toaster />
+            <Router />
+          </div>
         </TooltipProvider>
       </ThemeProvider>
     </QueryClientProvider>

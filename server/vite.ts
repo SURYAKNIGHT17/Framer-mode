@@ -19,12 +19,25 @@ export function log(message: string, source = "express") {
   console.log(`${formattedTime} [${source}] ${message}`);
 }
 
-export async function setupVite(app: Express, server: Server) {
+/**
+ * Sets up Vite in middleware mode with explicit HMR host/port for Windows compatibility.
+ * Attaches Vite middlewares and index.html transformer to the Express app.
+ *
+ * @param app Express application to attach Vite middlewares to.
+ * @param server Node HTTP server used by Vite HMR.
+ * @param opts Optional host and port for client HMR websocket.
+ */
+export async function setupVite(app: Express, server: Server, opts?: { host?: string; port?: number }) {
   const serverOptions = {
     middlewareMode: true,
-    hmr: { server },
+    hmr: {
+      server,
+      host: opts?.host,
+      port: opts?.port,
+      clientPort: opts?.port,
+    },
     allowedHosts: true as const,
-  };
+  } as const;
 
   const vite = await createViteServer({
     ...viteConfig,
@@ -61,12 +74,16 @@ export async function setupVite(app: Express, server: Server) {
       const page = await vite.transformIndexHtml(url, template);
       res.status(200).set({ "Content-Type": "text/html" }).end(page);
     } catch (e) {
-      vite.ssrFixStacktrace(e as Error);
+      (vite as any).ssrFixStacktrace?.(e as Error);
       next(e);
     }
   });
 }
 
+/**
+ * Serve static, prebuilt client assets in production from `server/public`.
+ * Falls back to `index.html` to support SPA client-side routing.
+ */
 export function serveStatic(app: Express) {
   const distPath = path.resolve(import.meta.dirname, "public");
 

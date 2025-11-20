@@ -12,6 +12,11 @@ interface ClaimCardProps {
   index: number;
 }
 
+/**
+ * ClaimCard
+ * Displays a single verified claim with collapsible evidence.
+ * Guards against fake/placeholder sources by hiding links to disallowed domains.
+ */
 export function ClaimCard({ claim, index }: ClaimCardProps) {
   const [isOpen, setIsOpen] = useState(false);
 
@@ -117,16 +122,22 @@ export function ClaimCard({ claim, index }: ClaimCardProps) {
                       <p className="font-mono text-sm text-muted-foreground leading-relaxed">
                         {snippet.snippet}
                       </p>
-                      <a
-                        href={snippet.url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="inline-flex items-center gap-1 text-sm text-primary hover:underline"
-                        data-testid={`link-evidence-${claim.id}-${idx}`}
-                      >
-                        Read more
-                        <ExternalLink className="h-3 w-3" />
-                      </a>
+                      {snippet.url && !snippet.url.includes("example.com") ? (
+                        <a
+                          href={snippet.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1 text-sm text-primary hover:underline"
+                          data-testid={`link-evidence-${claim.id}-${idx}`}
+                        >
+                          Read more
+                          <ExternalLink className="h-3 w-3" />
+                        </a>
+                      ) : (
+                        <span className="text-xs text-muted-foreground" data-testid={`link-evidence-unavailable-${claim.id}-${idx}`}>
+                          Source link unavailable
+                        </span>
+                      )}
                     </motion.div>
                   ))}
                 </motion.div>

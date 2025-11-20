@@ -2,28 +2,58 @@ import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { AnalysisInput } from "@/components/analysis-input";
 import { AnalysisResults } from "@/components/analysis-results";
-import { AnalysisHistory } from "@/components/analysis-history";
+import { AnalysisTable } from "@/components/analysis-table";
 import { EmptyState } from "@/components/empty-state";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { Shield } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { queryClient, apiRequest } from "@/lib/queryClient";
-import type { Analysis, AnalyzeResponse } from "@shared/schema";
+import { queryClient, apiRequest, getQueryFn } from "@/lib/queryClient";
+import type { Analysis, AnalyzeResponse, AuthMeResponse } from "@shared/schema";
 import { normalizeAnalyses } from "@/lib/api-utils";
 import { motion } from "framer-motion";
+import { LoaderOverlay } from "@/components/loader";
+import { Notification } from "@/components/notification";
+import { Button } from "@/components/ui/button";
+import { Link } from "wouter";
 
+/**
+ * Home
+ * Main analysis screen. Also displays auth status in header using /api/auth/me.
+ * Shows Login when unauthenticated; shows user email and Logout when authenticated.
+ */
 export default function Home() {
   const [selectedAnalysisId, setSelectedAnalysisId] = useState<string | undefined>();
+  const [notif, setNotif] = useState<{ title: string; description?: string; variant?: "success"|"error"|"info"; visible: boolean }>({ title: "", visible: false });
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const { toast } = useToast();
 
-  const { data: historyData } = useQuery<Analysis[]>({
+  const { data: historyData, isFetching: isHistoryFetching } = useQuery<Analysis[]>({
     queryKey: ["/api/history"],
     select: (data) => normalizeAnalyses(data),
+  });
+
+  const { data: me } = useQuery<AuthMeResponse | null>({
+    queryKey: ["/api/auth/me"],
+    queryFn: getQueryFn<AuthMeResponse | null>({ on401: "returnNull" }),
+  });
+
+  const logoutMutation = useMutation({
+    mutationFn: async () => {
+      return await apiRequest("POST", "/api/auth/logout");
+    },
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["/api/auth/me"] });
+      toast({ title: "Logged out", description: "You have been signed out." });
+    },
   });
 
   const analyzeMutation = useMutation({
     mutationFn: async (text: string) => {
       return await apiRequest<AnalyzeResponse>("POST", "/api/analyze", { text });
+    },
+    onMutate: () => {
+      // Show loader immediately on click, before network starts
+      setIsSubmitting(true);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/history"] });
@@ -34,31 +64,29 @@ export default function Home() {
         description: "Your text has been analyzed successfully.",
       });
     },
-    onError: () => {
-      toast({
-        title: "Analysis Failed",
-        description: "There was an error analyzing your text. Please try again.",
-        variant: "destructive",
-      });
+    onError: (err: any) => {
+      setNotif({ title: "Analyze failed", description: String(err?.message || ""), variant: "error", visible: true });
+    },
+    onSettled: () => {
+      // Hide loader once we have the final result
+      setIsSubmitting(false);
     },
   });
 
-  const selectedAnalysis = historyData?.find(a => a.id === selectedAnalysisId);
-  const hasResults = selectedAnalysis || analyzeMutation.data;
-  
-  // Convert AnalyzeResponse to Analysis if we have mutation data
-  const currentAnalysis: Analysis | undefined = selectedAnalysis || (analyzeMutation.data ? {
-    id: analyzeMutation.data.id,
-    inputText: analyzeMutation.data.inputText,
-    trustScore: analyzeMutation.data.trustScore,
-    statusText: analyzeMutation.data.statusText,
-    explanation: analyzeMutation.data.explanation,
-    claims: analyzeMutation.data.claims,
-    createdAt: new Date(analyzeMutation.data.createdAt),
-  } : undefined);
+  const isAnalyzing = isSubmitting || analyzeMutation.isPending;
+  const hasResults = historyData && historyData.length > 0;
+  const currentAnalysis = hasResults ? historyData[0] : undefined;
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen">
+      <LoaderOverlay visible={isAnalyzing} />
+      <Notification
+        visible={notif.visible}
+        title={notif.title}
+        description={notif.description}
+        variant={notif.variant}
+        onClose={() => setNotif(v => ({ ...v, visible: false }))}
+      />
       <header className="sticky top-0 z-50 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
         <div className="container mx-auto px-4 h-16 flex items-center justify-between">
           <motion.div
@@ -71,7 +99,19 @@ export default function Home() {
               Trust Score
             </h1>
           </motion.div>
-          <ThemeToggle />
+          <div className="flex items-center gap-3">
+            <ThemeToggle />
+            {me ? (
+              <>
+                <span className="text-sm text-muted-foreground">{me.email}</span>
+                <Button variant="outline" onClick={() => logoutMutation.mutate()}>Logout</Button>
+              </>
+            ) : (
+              <Link href="/login">
+                <Button variant="outline">Login</Button>
+              </Link>
+            )}
+          </div>
         </div>
       </header>
 
@@ -80,18 +120,18 @@ export default function Home() {
           <div className="lg:col-span-2 space-y-8">
             <AnalysisInput
               onAnalyze={(text) => analyzeMutation.mutate(text)}
-              isLoading={analyzeMutation.isPending}
+              isLoading={isAnalyzing}
             />
-            
-            {hasResults && currentAnalysis ? (
+            {/* Avoid any intermediate UI between loader and final results */}
+            {!isAnalyzing && hasResults && currentAnalysis ? (
               <AnalysisResults analysis={currentAnalysis} />
-            ) : (
+            ) : !isAnalyzing && !hasResults ? (
               <EmptyState />
-            )}
+            ) : null}
           </div>
 
           <div className="lg:col-span-1">
-            <AnalysisHistory
+            <AnalysisTable
               analyses={historyData || []}
               selectedId={selectedAnalysisId}
               onSelect={setSelectedAnalysisId}

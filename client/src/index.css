@@ -294,3 +294,24 @@
     inset: -1px;
   }
 }
+
+/* Background pattern inspired by wet-lionfish-63 */
+.app-pattern {
+  background-color: hsl(var(--background));
+  background-image:
+    radial-gradient(24px 24px at 20px 20px, hsl(var(--muted) / 0.35) 0%, transparent 70%),
+    radial-gradient(18px 18px at 80px 60px, hsl(var(--accent) / 0.25) 0%, transparent 70%),
+    radial-gradient(14px 14px at 140px 100px, hsl(var(--secondary) / 0.25) 0%, transparent 70%),
+    radial-gradient(8px 8px at 200px 140px, hsl(var(--primary) / 0.20) 0%, transparent 70%);
+  background-size: 240px 240px;
+  background-blend-mode: soft-light;
+}
+
+/* Subtle overlay to reduce visual clutter in dark mode */
+.dark .app-pattern::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(180deg, rgba(0,0,0,0.08), rgba(0,0,0,0.06));
+}

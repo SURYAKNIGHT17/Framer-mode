@@ -62,3 +62,22 @@ export const analyzeResponseSchema = z.object({
 });
 
 export type AnalyzeResponse = z.infer<typeof analyzeResponseSchema>;
+
+// Auth request/response schemas
+export const authRegisterRequestSchema = z.object({
+  email: z.string().email(),
+  password: z.string().min(6),
+});
+export type AuthRegisterRequest = z.infer<typeof authRegisterRequestSchema>;
+
+export const authLoginRequestSchema = z.object({
+  email: z.string().email(),
+  password: z.string().min(6),
+});
+export type AuthLoginRequest = z.infer<typeof authLoginRequestSchema>;
+
+export const authMeResponseSchema = z.object({
+  id: z.string(),
+  email: z.string().email(),
+});
+export type AuthMeResponse = z.infer<typeof authMeResponseSchema>;

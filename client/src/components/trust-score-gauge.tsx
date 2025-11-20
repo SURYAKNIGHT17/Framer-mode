@@ -1,11 +1,18 @@
 import { motion } from "framer-motion";
 import { useMemo } from "react";
+import React from "react";
 
 interface TrustScoreGaugeProps {
   score: number;
   statusText: string;
 }
 
+
+/**
+ * TrustScoreGauge
+ * Renders a circular progress gauge and the dynamic "score/100" label.
+ * Accepts numeric `score` and a `statusText` string for the caption.
+ */
 export function TrustScoreGauge({ score, statusText }: TrustScoreGaugeProps) {
   const { color, gradient } = useMemo(() => {
     if (score >= 75) {
@@ -26,8 +33,9 @@ export function TrustScoreGauge({ score, statusText }: TrustScoreGaugeProps) {
     }
   }, [score]);
 
+  const safeScore = Number.isFinite(score) && score != null ? Math.max(0, Math.min(100, Math.round(score))) : 0;
   const circumference = 2 * Math.PI * 90;
-  const strokeDashoffset = circumference - (score / 100) * circumference;
+  const strokeDashoffset = circumference - (safeScore / 100) * circumference;
 
   return (
     <motion.div
@@ -69,9 +77,8 @@ export function TrustScoreGauge({ score, statusText }: TrustScoreGaugeProps) {
             className="text-center"
           >
             <div className="text-hero text-foreground" data-testid="text-trust-score">
-              {score}
+              {Math.round(safeScore)}/100
             </div>
-            <div className="text-2xl text-muted-foreground font-medium">/100</div>
           </motion.div>
         </div>
       </div>

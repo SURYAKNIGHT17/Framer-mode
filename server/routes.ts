@@ -4,9 +4,36 @@ import { storage } from "./storage";
 import { analyzeRequestSchema } from "@shared/schema";
 import { extractClaims, verifyClaim, calculateTrustScore } from "./claim-extractor";
 
+/**
+ * Very simple per-IP rate limiter for /api/analyze.
+ * Defaults: 20 requests / 2 minutes per IP. Tunable via env.
+ */
+const WINDOW_MS = parseInt(process.env.ANALYZE_RATE_LIMIT_WINDOW_MS || "120000", 10);
+const MAX_REQ = parseInt(process.env.ANALYZE_RATE_LIMIT_MAX || "20", 10);
+const buckets = new Map<string, { count: number; resetAt: number }>();
+function rateLimit(req: any, res: any, next: any) {
+  const ip = req.ip || req.headers["x-forwarded-for"] || "unknown";
+  const now = Date.now();
+  const existing = buckets.get(ip) || { count: 0, resetAt: now + WINDOW_MS };
+  if (now > existing.resetAt) {
+    existing.count = 0;
+    existing.resetAt = now + WINDOW_MS;
+  }
+  existing.count += 1;
+  buckets.set(ip, existing);
+  if (existing.count > MAX_REQ) {
+    const retryAfterMs = Math.max(0, existing.resetAt - now);
+    return res.status(429).json({ error: "Rate limit exceeded", retryAfterMs });
+  }
+  next();
+}
+
+/**
+ * Register API routes for analysis and history.
+ */
 export async function registerRoutes(app: Express): Promise<Server> {
   // POST /api/analyze - Analyze text and return trust score with claims
-  app.post("/api/analyze", async (req, res) => {
+  app.post("/api/analyze", rateLimit, async (req, res) => {
     try {
       const result = analyzeRequestSchema.safeParse(req.body);
       
@@ -22,8 +49,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Extract claims from text
       const claimTexts = extractClaims(text);
 
-      // Verify each claim
-      const claims = claimTexts.map(claimText => verifyClaim(claimText));
+      // Verify each claim (async web search)
+      const claims = await Promise.all(claimTexts.map(claimText => verifyClaim(claimText)));
 
       // Calculate overall trust score
       const { trustScore, statusText, explanation } = calculateTrustScore(claims);
@@ -53,7 +80,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // GET /api/history - Get all past analyses
-  app.get("/api/history", async (req, res) => {
+  app.get("/api/history", async (_req, res) => {
     try {
       const analyses = await storage.getAllAnalyses();
       return res.json(analyses);
